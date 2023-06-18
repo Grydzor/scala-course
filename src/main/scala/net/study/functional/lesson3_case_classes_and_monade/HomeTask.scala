@@ -14,6 +14,7 @@ object HomeTask extends App {
   final case class PaymentInfo(paymentId: Int, sum: Long, tax: Long, desc: String)
 
   object PaymentCenter {
+
     def getPaymentSum(id: Int): Option[Long] = Option(id) filter (_ > 2) map (_ * 100)
   }
 
@@ -30,7 +31,34 @@ object HomeTask extends App {
     PaymentInfoDto(4, Some("customerC"), Some(1000), Some(200), None)
   )
 
+  val filteredDTO = payments.distinct
+    .map(dto => dto.sum match {
+      case None => dto.copy(sum = PaymentCenter.getPaymentSum(dto.paymentId))
+      case _ => dto
+    })
+    .withFilter(dto => dto.sum.nonEmpty)
 
+  var outputList: Seq[PaymentInfo] = for (dto <- filteredDTO) yield{
 
+    val sum: Long = dto.sum match {
+      case Some(a) => a
+    }
+
+    val tax: Long  = dto.tax match {
+      case None => if (sum < 100) 0 else (sum * 0.2).longValue()
+      case Some(a) => a
+    }
+
+    val desc: String = dto.desc match {
+      case Some(a) => a
+      case None => "technical"
+    }
+
+    val payment = PaymentInfo(paymentId = dto.paymentId, sum = sum, tax = tax, desc = desc)
+
+    payment
+  }
+
+  outputList.foreach(println(_))
 
 }
