@@ -31,34 +31,24 @@ object HomeTask extends App {
     PaymentInfoDto(4, Some("customerC"), Some(1000), Some(200), None)
   )
 
-  val filteredDTO = payments.distinct
-    .map(dto => dto.sum match {
-      case None => dto.copy(sum = PaymentCenter.getPaymentSum(dto.paymentId))
-      case _ => dto
-    })
-    .withFilter(dto => dto.sum.nonEmpty)
 
-  var outputList: Seq[PaymentInfo] = for (dto <- filteredDTO) yield{
+  def computeTax(sumToTax: Long): Option[Long] = Some(sumToTax).filter(sum => sum > 100).map(sum => sum * 20 / 100).orElse(Some(0))
 
-    val sum: Long = dto.sum match {
-      case Some(a) => a
-    }
+  def correctPayment(id: Int, payment: Option[Long]): Option[Long] = payment.orElse(PaymentCenter.getPaymentSum(id))
 
-    val tax: Long  = dto.tax match {
-      case None => if (sum < 100) 0 else (sum * 0.2).longValue()
-      case Some(a) => a
-    }
+  def correctTax(tax: Option[Long], sum: Long): Option[Long] = tax.orElse(computeTax(sum))
 
-    val desc: String = dto.desc match {
-      case Some(a) => a
-      case None => "technical"
-    }
+  def correctDesc(desc: Option[String]): Option[String] = desc.orElse(Some("technical"))
 
-    val payment = PaymentInfo(paymentId = dto.paymentId, sum = sum, tax = tax, desc = desc)
+  def correctPaymentInfo(paymentInfoDto: PaymentInfoDto): Option[PaymentInfo] = for {
+    sumCalculated <- correctPayment(paymentInfoDto.paymentId, paymentInfoDto.sum)
+    taxSum <- correctTax(paymentInfoDto.tax, sumCalculated)
+    desc <- correctDesc(paymentInfoDto.desc)
 
-    payment
-  }
+  } yield PaymentInfo(paymentInfoDto.paymentId, sumCalculated, taxSum, desc)
 
-  outputList.foreach(println(_))
+  val result: Seq[PaymentInfo] = (payments.distinct).flatMap(x => correctPaymentInfo(x))
+
+  result foreach println
 
 }
