@@ -45,8 +45,8 @@ object Lesson4 extends App {
     case ex@(_: MyCustomException | _: MyAnotherCustomException) => ex.toString
     case a: Throwable                                            => a.toString
   } finally {
-    println("dfgdafgfdfgdafg")
-    "FinallyAnswer"
+//    println("dfgdafgfdfgdafg")
+//    "FinallyAnswer"
   }
 
   /// Try Monad
