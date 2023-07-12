@@ -68,17 +68,17 @@ object HomeTask extends App {
   case object AnyOtherError extends Error // to handle anything else
 
 
-  val toSubscriber: String => Option[SubscriberInfo] = (line: String) => Option(line.split(";"))
+  def toSubscriber: String => Option[SubscriberInfo] = (line: String) => Option(line.split(";"))
     .filter(arr => arr.length == 2)
     .map({
     case Array(x, y) => SubscriberInfo(x.trim, y.trim.toInt, isActive = false)
   }).orElse(Some(throw new RuntimeException(s"parse error $line")))
 
-  val toSubscribers: BufferedSource => List[SubscriberInfo] = (source: BufferedSource) =>
+  def toSubscribers: BufferedSource => List[SubscriberInfo] = (source: BufferedSource) =>
       try source.getLines().map(toSubscriber).toList.flatten
       finally source.close()
 
-  val enrichSubscriber: (SubscriberInfo, Option[Int]) => Option[SubscriberInfo] = (subscriberInfo: SubscriberInfo, searchResult: Option[Int]) =>
+  def enrichSubscriber: (SubscriberInfo, Option[Int]) => Option[SubscriberInfo] = (subscriberInfo: SubscriberInfo, searchResult: Option[Int]) =>
     searchResult map (activeState => subscriberInfo.copy(isActive = activeState == 1)) orElse Some(subscriberInfo)
 
 
@@ -117,7 +117,7 @@ object HomeTask extends App {
       AnyOtherError
   }
 
-  enrichAndSend(false, false, false, true, fileSource).left.foreach(println(_))
+  enrichAndSend(getFileIsRisky = false, getDataFromMainSourceIsRisky = false, getDataFromAlternativeSourceIsRisky = false, sendToProviderIsRisky = false, fileSource).right.foreach(println(_))
 
 
 }
