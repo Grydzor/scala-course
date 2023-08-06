@@ -182,50 +182,45 @@ object HomeTask extends App {
 
   /////////////////////////////Implementation///////////////////////////////////////
 
-  def tokenGenerator(request: PaymentRequest, product: Product): PaymentToken = {
-    SecurityServer.generatePaymentToken(msisdn = request.msisdn, product = product, tempCode = request.tempCode)
+  val defaultPaymentDomain: PaymentDomain = {
+    case failRequest => PaymentResult(failRequest, PaymentResponse(-1, -1))
   }
 
-  def tokenProvider(request: PaymentRequest): TokenProvider = tokenGenerator(request, _)
-
-  val defaultPaymentService = new PaymentService {
-    override def geographicalPriority: Int = 0
-    override def canProcess[T <: ProductType](product: T): Boolean = false
-    println("Default payment service")
+  val defaultPostPaymentDomain: PostPaymentDomain = {
+    case notProcessedResult => PaymentStatus(notProcessedResult.request, Default)
   }
 
-  val toPartialFunction: BusinessDomain[PaymentService, PaymentService] = {
-    case value => value
+  def f(msisdn: String, tempCode: Int, product: Product) = SecurityServer.generatePaymentToken(msisdn, product, tempCode)
+
+  def createPaymentDomain(paymentService: PaymentService): PaymentDomain = {
+    case payment if paymentService.canProcess(payment.productType) =>
+      val curr = (f _).curried
+      val tokenProvider: TokenProvider = curr(payment.msisdn)(payment.tempCode) //generatePaymentToken(payment.msisdn, _: ProductType, payment.tempCode)
+      PaymentResult(payment, paymentService.withdrawPayment(payment, tokenProvider))
   }
 
-
-  val chainedDomainFunction: BusinessDomain[PaymentService, PaymentService] = {
-    chainDomains(serverPool.sortBy(payment => payment.geographicalPriority).map(_ => toPartialFunction).toList, toPartialFunction)
+  def createPostPaymentDomain(postPaymentService: PostPaymentService): PostPaymentDomain = {
+    case paymentResult if postPaymentService.codesToProcess.contains(paymentResult.response.code) =>
+      // any this domain business logic
+      PaymentStatus(paymentResult.request, postPaymentService.processResult(paymentResult))
   }
 
-  def filterProcessing(product:Product): Boolean = !chainedDomainFunction(defaultPaymentService).canProcess(product)
-
-  def paymentDomainProcessing: PaymentDomain = {
-    case request: PaymentRequest =>
-      PaymentResult(request, chainedDomainFunction(defaultPaymentService).withdrawPayment(request, tokenProvider(request)))
+  def postPaymentService(status: Status, codes: Set[Int]): PostPaymentService = new PostPaymentService {
+    override val serviceStatus: Status = status
+    override val codesToProcess: Set[Int] = codes
   }
 
-  def codeToStatus(code: Int): Status = {
-    val processed: Set[Int] = statusCodes(Processed)
-    val clientMistake: Set[Int] = statusCodes(ClientMistake)
-    val serverMistake: Set[Int] = statusCodes(ServerMistake)
+  val paymentDomain: PaymentDomain = chainDomains(serverPool sortBy (_.geographicalPriority) map createPaymentDomain toList, defaultPaymentDomain)
 
-    if (processed.contains(code)) Processed
-    else if (clientMistake.contains(code)) ClientMistake
-    else if (serverMistake.contains(code)) ServerMistake
-    else Default
-  }
+  val postPaymentDomain: PostPaymentDomain = chainDomains(statusCodes.map { s =>
+    val (status, codes) = s
+    val subPostPaymentDomain: PartialFunction[PaymentResult, PaymentStatus] = createPostPaymentDomain(postPaymentService(status, codes))
+    subPostPaymentDomain
+  }.toList, defaultPostPaymentDomain)
 
-  def postPaymentServiceImpl: PostPaymentDomain = {
-    case result => PaymentStatus(request = result.request, codeToStatus(result.response.code))
-  }
+  val paymentFlow: BusinessDomain[PaymentRequest, PaymentStatus] = paymentDomain andThen postPaymentDomain
 
-  payments.filter(request => filterProcessing(request.productType))
-    .map(request => postPaymentServiceImpl(paymentDomainProcessing(request)))
-    .foreach(println(_))
+  val result: Seq[PaymentStatus] = payments map paymentFlow
+
+  result foreach println
 }
