@@ -15,17 +15,16 @@ trait RequestHandler[R, DTO, RESP] {
 
   this: RequestValidator[R] with Mapper[R, DTO] with Processor[DTO, RESP] =>
 
-  def handle(request: R)(implicit mapperFunc: R => DTO): Either[Error, RESP] = ???
-
+  protected def handle(request: R)(implicit mapperFunc: R => DTO): Either[Error, RESP] =
+    for {_ <- validate(request)
+         dto <- map(request)
+         resp <- process(dto)
+         } yield resp
 }
 
 trait SignUpHandler
   extends RequestHandler[SignUpRequest, SignUpDto, SignUpResponse]
     with SignUpValidator
     with SignUpMapper
-    with SignUpProcessor{
-
-  override def handle(request: SignUpRequest)(implicit mapperFunc: SignUpRequest => SignUpDto): Either[Error, SignUpResponse] = ???
-
-}
+    with SignUpProcessor
 
