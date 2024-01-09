@@ -1,4 +1,4 @@
-package net.study.functional.lesson_12_mutable_collection
+package net.study.functional.lesson12_mutable_collection
 
 import scala.collection.mutable
 

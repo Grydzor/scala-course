@@ -9,7 +9,7 @@ object SelfWork extends App {
 
   val nums = List(1, 2, 3, 4, 5, 7, 9, 11, 14, 12, 16)
 
-  val oddSum = nums.filter(el => el % 2==1).sum
+  val oddSum = nums.partition(el => el % 2==1)
   val evenSum = nums.filter(el => el % 2==0).sum
   println(oddSum)
   println(evenSum)
@@ -57,6 +57,9 @@ object SelfWork extends App {
   )
 
   println(companies.sortBy(comp => comp.capitalization).reverse.take(3))
+//  val totalCapitalization = companies
+//    .reduceLeftOption((acc, next) => acc.capitalization + next.capitalization)
+//  println(totalCapitalization)
 
 
   /////////////////// calculate turnover per regions excluding partner servers
@@ -105,6 +108,16 @@ object SelfWork extends App {
 
   val combinedMap = domains ++ ips
   servers.filter(p => !p.isPartner)
-    .map(p => p.copy(host = combinedMap.get(p.host).get))
-    .groupBy(p => p.host).mapValues(_.size)
+    .map(p => p.copy(host = combinedMap.get(p.host) match {
+      case Some(EASTERN) => "EASTERN"
+      case Some(WESTERN) => "WESTERN"
+      case Some(SOUTHERN) => "SOUTHERN"
+      case Some(NORTH) => "NORTH"
+      case None => "NULL"
+    }))
+    .groupBy(p => p.host)
+
+//  servers.map()
+
+
 }
